@@ -1,0 +1,132 @@
+#include <stdio.h>
+#include <GL\glew.h>
+#include <GLFW\glfw3.h>
+
+// variaveis globais
+const GLint WIDTH = 800, HEIGHT = 600; // O GLint vai ser o componente criado direto no glew
+GLuint VAO, VBO, shaderProgram; //um inteiro não sinalizado onde só vai ter valores 0,512 não tem o lado negativo
+
+//código em GLSL - vc2 vai ter o valor de (x e y) 
+// o programa vai pegar a posição de x e y
+static const char* vertexShader = "					\n\
+#version 330										\n\
+													\n\
+layout(location=0) in vec2 pos;						\n\
+													\n\
+void main() {										\n\
+	gl_Position = vec4(pos.x, pos.y, 0.0, 1.0);		\n\
+}													\n\
+";
+
+//fragmento o que podemos mudar do desenho que podemos fazer o vec3 e por causa do RGB
+static const char* fragmentShader = "				\n\
+#version 330										\n\
+													\n\
+uniform in vec3 triColor;							\n\
+													\n\
+void main() {										\n\
+	color = vec4(triColor, 1.0);					\n\
+}													\n\
+";
+
+void criarTriangulo() {
+	GLfloat vertices[] = {
+		0.0f, 1.0f, //vertices 1
+		- 1.0f, -1.0f, //vertices 2
+		1.0f, -1.0f //vertices 3
+	};
+
+	// abrir um espaço na placa de video a onde vai ser guardado algo
+	glGenVertexArrays(1, &VAO); // alocando - inteiro não sinalizado
+	glBindVertexArray(VAO); // me da o espaço de memoria pra eu alterar ele!
+		
+		glGenBuffers(1, &VBO); // o VAO esta apontando pro VBO
+		glBindBuffer(GL_ARRAY_BUFFER, VBO); //começa a contar pra escrever 
+
+			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW); 
+			glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+			glEnableVertexAttribArray(0); //location
+
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glBindVertexArray(0);
+}
+
+//adiciona um programa dentro da tela
+void adicionaTriangulo(GLuint program,const char* shaderCode, GLenum type) {
+	GLuint _shader = glCreateShader(type);
+
+	// converte char para GL_CHAR
+	const GLchar* code[1];
+	code[0] = shaderCode;
+
+	glShaderSource(_shader, 1, code, NULL);
+	glCompileShader(_shader);
+
+	// tratar os erros (aula que vêm)
+
+
+
+	glAttachShader(program, _shader);
+}
+
+void adicionaPrograma() {
+	shaderProgram = glCreateProgram();
+	if (!shaderProgram) {
+		printf("Erro ao criar o programa");
+		return;
+	}
+	adicionaTriangulo(shaderProgram, vertexShader, GL_VERTEX_SHADER);
+	adicionaTriangulo(shaderProgram, fragmentShader, GL_FRAGMENT_SHADER);
+
+	glLinkProgram(shaderProgram);
+}
+
+// quando o aplicativo rodar vai rodar o main
+int main() {
+	// iniciar o glfw
+	if (!glfwInit()) {
+		printf("Glfw não foi iniciado");
+		glfwTerminate(); // isso e caso tenha um erro e gaste a memoria da memoria do computador então vai parar o erro que pode ser causado
+		return 1;
+	}
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // isso e so pra usar a base
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // tudo que tiver gl na frente e do glew - o glew vai fazer todo o gerenciamento de agora em diante
+	// o glew sempre gera o o tamanho exemplo float ou int - a gente manda o glew fazer isso
+
+	//fazendo uma janela
+	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Computação gráfica", NULL, NULL); // o window vai ser um ponteiro ja que o glfwCreateWindow devolve um endereço
+
+	if (!window) {
+		printf("Erro ao criar a janela");
+		glfwTerminate();
+		return 1;
+	}
+
+	int bufferWidth, bufferHeight;
+	glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);
+	glfwMakeContextCurrent(window); // principal janela que vai ser usada
+
+	glewExperimental = GL_TRUE;
+	if (glewInit() != GLEW_OK) {
+		printf("Erro ao inicar o glew");
+		glfwDestroyWindow(window); // destroi a janela caso de erro!
+		glfwTerminate(); // isso e caso tenha um erro e gaste a memoria da memoria do computador então vai parar o erro que pode ser causado
+		return 1;
+	}
+
+	glViewport(0, 0, bufferWidth, bufferHeight); // os 0´s vão começar na altura e largura  0/0  - o que vai ser no meio
+
+	while (!glfwWindowShouldClose(window)) { // enquanto a janela não for fechada o loop vai continuar rodando
+		glClearColor(0.0f, 1.0f, 1.0f, 1.0f); // RGBA A - de transparencia
+		glfwPollEvents();
+		glClear(GL_COLOR_BUFFER_BIT); // altera a cor de fundo
+		glfwSwapBuffers(window);
+	}
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
+	return 0;
+}
