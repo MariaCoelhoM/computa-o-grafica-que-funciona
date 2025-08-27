@@ -2,12 +2,20 @@
 #include <GL\glew.h>
 #include <GLFW\glfw3.h>
 
+// VAO é o ponteiro do programa que estou rodando, espaço de memória que representa aquele objeto
+// VBO é o ponteiro para os meus dados brutos, são os dados do objeto a ser representado pelo VAO 
+// shaderProgram é qual programa estou rodando 
+// todo programa pode ser chamado de shader
+
 // variaveis globais
 const GLint WIDTH = 800, HEIGHT = 600; // O GLint vai ser o componente criado direto no glew
 GLuint VAO, VBO, shaderProgram; //um inteiro não sinalizado onde só vai ter valores 0,512 não tem o lado negativo
 
 //código em GLSL - vc2 vai ter o valor de (x e y) 
 // o programa vai pegar a posição de x e y
+// passando um argumento para o inicio do programa (args do C++                        
+// estou passando um argumento de entrada na primeira posiçâo                             
+// esse argumento deve ser um vetor de duas posições
 static const char* vertexShader = "					\n\
 #version 330										\n\
 													\n\
@@ -19,10 +27,15 @@ void main() {										\n\
 ";
 
 //fragmento o que podemos mudar do desenho que podemos fazer o vec3 e por causa do RGB
+// diferente da entrada por layout, uniform é uma entrada em tempo de execução   
+// fragment pode ser lido como "a partir desse ponto o que faço com ele?"
+// shader para atribuir cores aos pontos
+// diferente da entrada por layout, uniform é uma entrada em tempo de execução 
 static const char* fragmentShader = "				\n\
 #version 330										\n\
 													\n\
-uniform in vec3 triColor;							\n\
+uniform vec3 triColor;								\n\
+out vec4 color;										\n\
 													\n\
 void main() {										\n\
 	color = vec4(triColor, 1.0);					\n\
@@ -30,29 +43,29 @@ void main() {										\n\
 ";
 
 void criarTriangulo() {
-	GLfloat vertices[] = {
+	GLfloat vertices[] = { //nosso buffer de vertices
 		0.0f, 1.0f, //vertices 1
-		- 1.0f, -1.0f, //vertices 2
+		-1.0f, -1.0f, //vertices 2
 		1.0f, -1.0f //vertices 3
 	};
 
 	// abrir um espaço na placa de video a onde vai ser guardado algo
 	glGenVertexArrays(1, &VAO); // alocando - inteiro não sinalizado
 	glBindVertexArray(VAO); // me da o espaço de memoria pra eu alterar ele!
-		
-		glGenBuffers(1, &VBO); // o VAO esta apontando pro VBO
-		glBindBuffer(GL_ARRAY_BUFFER, VBO); //começa a contar pra escrever 
 
-			glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW); 
-			glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-			glEnableVertexAttribArray(0); //location
+	glGenBuffers(1, &VBO); // o VAO esta apontando pro VBO
+	glBindBuffer(GL_ARRAY_BUFFER, VBO); //começa a contar pra escrever 
 
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-			glBindVertexArray(0);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0); //location
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
 }
 
 //adiciona um programa dentro da tela
-void adicionaTriangulo(GLuint program,const char* shaderCode, GLenum type) {
+void adicionaTriangulo(GLuint program, const char* shaderCode, GLenum type) {
 	GLuint _shader = glCreateShader(type);
 
 	// converte char para GL_CHAR
@@ -83,7 +96,7 @@ void adicionaPrograma() {
 
 // quando o aplicativo rodar vai rodar o main
 int main() {
-	// iniciar o glfw
+	// iniciar o glfw 
 	if (!glfwInit()) {
 		printf("Glfw não foi iniciado");
 		glfwTerminate(); // isso e caso tenha um erro e gaste a memoria da memoria do computador então vai parar o erro que pode ser causado
@@ -97,7 +110,7 @@ int main() {
 	// o glew sempre gera o o tamanho exemplo float ou int - a gente manda o glew fazer isso
 
 	//fazendo uma janela
-	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Computação gráfica", NULL, NULL); // o window vai ser um ponteiro ja que o glfwCreateWindow devolve um endereço
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Computação gráfica", NULL, NULL); // o window vai ser um ponteiro ja que o glfwCreateWindow devolve um endereço
 
 	if (!window) {
 		printf("Erro ao criar a janela");
@@ -118,13 +131,34 @@ int main() {
 	}
 
 	glViewport(0, 0, bufferWidth, bufferHeight); // os 0´s vão começar na altura e largura  0/0  - o que vai ser no meio
+	criarTriangulo();
+	adicionaPrograma();
 
+	// de fundo da janela
 	while (!glfwWindowShouldClose(window)) { // enquanto a janela não for fechada o loop vai continuar rodando
-		glClearColor(0.0f, 1.0f, 1.0f, 1.0f); // RGBA A - de transparencia
+		glClearColor(1.0f, 0.0f, 0.0f, 1.0f); // RGBA A - de transparencia
 		glfwPollEvents();
 		glClear(GL_COLOR_BUFFER_BIT); // altera a cor de fundo
-		glfwSwapBuffers(window);
-	}
+	
+	//altera a cor do triangulo
+	GLint uniformColor = glGetUniformLocation(shaderProgram, "triColor");
+	glUniform3f(uniformColor, 1.0f, 1.0f, 0.0f); // e pra sair a cor amarela
+
+	// testando com numeros aleatorios 
+
+	GLint R = glGetUniformLocation(shaderProgram, "triColor");
+	glUniform3f(uniformColor, 1.0f, 1.0f, 1.0f);
+
+	//desenhando o triangulo
+	glUseProgram(shaderProgram);
+	glBindVertexArray(VAO);
+	glDrawArrays(GL_TRIANGLES, 0, 3); //triangulo começando na posição 0, numeros de pontos 3
+		glBindVertexArray(0);
+
+
+	glfwSwapBuffers(window);
+
+}
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
