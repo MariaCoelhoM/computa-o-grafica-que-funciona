@@ -13,7 +13,7 @@
 
 // variaveis globais
 const GLint WIDTH = 800, HEIGHT = 600; // O GLint vai ser o componente criado direto no glew
-GLuint VAO, VBO, shaderProgram; //um inteiro não sinalizado onde só vai ter valores 0,512 não tem o lado negativo
+GLuint VAO, VBO, IBO, shaderProgram; //um inteiro não sinalizado onde só vai ter valores 0,512 não tem o lado negativo
 
 float toRadians = 3.1415f / 180.0f;
 //float directionY = false;
@@ -30,15 +30,18 @@ float triCurrentAngle = 0.0f, triAngleIncrement = 1.0f;
 // esse argumento deve ser um vetor de duas posições
 // layout pode mudar mais depois da execução
 // uniform float posX; - nova posição de dados 
+// o clamp faz direito pegar o min e max dos valores 
 static const char* vertexShader = "									\n\
 #version 330														\n\
 																	\n\
-layout(location=0) in vec2 pos;										\n\
+layout(location=0) in vec3 pos;										\n\
 uniform mat4 model;													\n\
-																	\n\
+uniform mat4 projection;											\n\
+out vec4 vCol;														\n\
 																	\n\
 void main() {														\n\
-	gl_Position = model * vec4(pos.x, pos.y, 0.0, 1.0);				\n\
+	gl_Position = projection * model * vec4(pos, 1.0);				\n\
+	vCol = vec4(clamp(pos, 0.0 , 1.0f), 1.0f);						\n\
 }																	\n\
 ";
 
@@ -51,30 +54,44 @@ void main() {														\n\
 static const char* fragmentShader = "				\n\
 #version 330										\n\
 													\n\
+in vec4 vCol;										\n\
 uniform vec3 triColor;								\n\
 out vec4 color;										\n\
 													\n\
 void main() {										\n\
-	color = vec4(triColor, 1.0);					\n\
+	color = vCol;									\n\
 }													\n\
 ";
 
 void criarTriangulo() {
+	unsigned int indices[] = {
+		0,1,2, //Base
+		0,1,3, //face 1 da esquerda
+		0,2,3, //face 2 da direita
+		1,2,3, //frente
+	};
+
+
 	GLfloat vertices[] = { //nosso buffer de vertices
-		0.0f, 1.0f, //vertices 1
-		-1.0f, -1.0f, //vertices 2
-		1.0f, -1.0f //vertices 3
+		0.0f, 1.0f, 0.0f,//vertices 1
+		-1.0f, -1.0f, 0.0f, //vertices 2
+		1.0f, -1.0f, 0.0f, //vertices 3
+		0.0f, 0.0f, 1.0f, //vertice 4 
 	};
 
 	// abrir um espaço na placa de video a onde vai ser guardado algo
 	glGenVertexArrays(1, &VAO); // alocando - inteiro não sinalizado
 	glBindVertexArray(VAO); // me da o espaço de memoria pra eu alterar ele!
+	
+	glGenBuffers(1, &IBO); // IBO - indice buffer objects
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	glGenBuffers(1, &VBO); // o VAO esta apontando pro VBO
 	glBindBuffer(GL_ARRAY_BUFFER, VBO); //começa a contar pra escrever 
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(0); //location
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -151,9 +168,11 @@ int main() {
 	criarTriangulo();
 	adicionaPrograma();
 
+	glm::mat4 projection = glm::perspective(45.0f, (GLfloat)bufferWidth / (GLfloat)bufferHeight, 0.1f, 100.0f); //camera - distancia - o qual perto e o qual longe da camera
+
 	// de fundo da janela
 	while (!glfwWindowShouldClose(window)) { // enquanto a janela não for fechada o loop vai continuar rodando
-		glClearColor(1.0f, 0.0f, 0.0f, 1.0f); // RGBA A - de transparencia
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // RGBA A - de transparencia
 		glfwPollEvents();
 		glClear(GL_COLOR_BUFFER_BIT); // altera a cor de fundo
 	
@@ -182,11 +201,16 @@ int main() {
 		directionSize = !directionSize;
 
 	GLint uniformModel = glGetUniformLocation(shaderProgram, "model"); // estamos pegando as posições
+	GLint uniformProjection = glGetUniformLocation(shaderProgram, "projection");
 	glm::mat4 model(1.0f); //criamos uma matriz 4x4 onde tem 1´s dentro dela
-	model = glm::translate(model, glm::vec3(triOffset, 0.0f, 0.0f));
-	model = glm::scale(model, glm::vec3(triOffsetSize, triOffsetSize, 0.0f));
-	model = glm::rotate(model, triCurrentAngle * toRadians, glm::vec3(1.0f, 0.15f, 0.20f)); // isso aqui faz rotação no x, y,z
+	
+	model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.5f));
+	model = glm::scale(model, glm::vec3(0.4f, 0.4f, 0.4f));
+	model = glm::rotate(model, triCurrentAngle * toRadians, glm::vec3(0.7f, 0.5f, 1.0f)); // isso aqui faz rotação no x, y,z
+	
 	glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+	glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, glm::value_ptr(projection));
+
 
 
 	//movimenta o triangulo Y
@@ -212,8 +236,14 @@ int main() {
 	//desenhando o triangulo
 	glUseProgram(shaderProgram);
 	glBindVertexArray(VAO);
-	glDrawArrays(GL_TRIANGLES, 0, 3); //triangulo começando na posição 0, numeros de pontos 3
-		glBindVertexArray(0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+			glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0); // os 12 lados dos triangulos e seus pontos de ligação entre eles
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); // pra sinalizar que acabou o IBO
+	glBindVertexArray(0);
+
+	//glBindVertexArray(VAO);
+	//	glDrawArrays(GL_TRIANGLES, 0, 3); //triangulo começando na posição 0, numeros de pontos 3
+	//glBindVertexArray(0);
 
 
 	glfwSwapBuffers(window);
